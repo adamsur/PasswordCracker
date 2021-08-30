@@ -1,0 +1,121 @@
+#!/usr/bin/python3
+
+from passlib.hash import lmhash
+from passlib.hash import nthash
+import crypt
+import sys
+
+print("")
+
+if "-v" in sys.argv:
+    def verbosePrint(*args):
+        for arg in args:
+            print(arg)
+else:
+    verbosePrint = lambda a : None
+
+#Function used to take inputted hash and opened wordlist for cracking
+def crackUnix(hash, wordList, salt):
+
+#Each word is hashed using "HX" as a DES salt and compared to the inputted hash
+    for word in wordList:
+        resultsUnix = crypt.crypt(word, salt)
+        if resultsUnix == hash : #If one of the hashes match, the word/password is returned
+            return word
+        verbosePrint("[*] {word} = {result}, Hash does not match...\n".format(word=word, result=resultsUnix))
+
+#If none of the words on the wordlist match the original hash the program ends
+    print("No word in the list matches the hash provided with {salt} as a salt".format(salt=salt))
+    sys.exit(0)
+
+def crackLM(hash, wordList):
+    if len(hash) != 32:
+        print("[-] The hash entered is not a Lan Manager hash.\n~LM hashes must be 32 characters long~")
+        sys.exit(0)
+
+    for word in wordList:
+        resultsLM = lmhash.verify(word, hash)
+        if resultsLM == True:
+            return word
+        verbosePrint("[*] {word}, Hash does not match...\n".format(word=word))
+
+    print("No word in the list matches the Lan Manager hash provided")
+    sys.exit(0)
+
+def crackNT(hash, wordList):
+    if len(hash) != 32:
+        print("[-] The hash entered is not an NT hash.\n~NT hashes must be 32 characters long~")
+        sys.exit(0)
+
+    for word in wordList:
+        resultsNT = nthash.verify(word, hash)
+        if resultsNT == True:
+            return word
+        verbosePrint("[*] {word}, Hash does not match... {count}\n".format(word=word, count=count))
+
+    print("No word in the list matches the NT hash provided")
+    sys.exit(0)
+
+def NTLMhash():
+    NTLM = sys.argv[1]
+    NTLM = NTLM.split(":")
+    hash = NTLM[2]
+    file = sys.argv[2]
+    return hash, file
+
+#Function for opening wordlist file and putting each word into a list
+def readFile(file):
+    wordList = []
+
+    fileOpen = open(file)
+    try:
+        for line in fileOpen: #Goes through lines of the file and adds each word to a list
+            line = line.rstrip()
+            wordList.append(line)
+    except:
+        next(fileOpen)
+    return wordList
+
+
+def main():
+    hashType = ""
+
+    if len(sys.argv) > 3:
+    #Takes first and second arguments of script, makes them variables
+        hashType = sys.argv[1]
+        hash = sys.argv[2]
+        file = sys.argv[3]
+
+    if len(sys.argv) == 3 and sys.argv[:3] != '-h':
+        hash, file = NTLMhash()
+
+    #(Temporary) - Will be used for help/usage option
+    if "-h" in sys.argv:
+        print("Pizza")
+        sys.exit(0)
+
+    if "-s" in sys.argv:
+        salt = sys.argv[sys.argv.index("-s")+1]
+    else:
+        salt = "HX"
+
+    try:
+        wordList = readFile(file)
+    except:
+        usage() #WIP
+        sys.exit(1)
+
+    if hashType == "NT" or hashType == "":
+        hashMatch = crackNT(hash, wordList)
+    elif hashType == "LM":
+        hashMatch = crackLM(hash, wordList)
+    elif hashType == "Unix":
+        hashMatch = crackUnix(hash, wordList, salt)
+    else:
+        usage() #WIP on usage function
+
+    print("[+] A match was found for {hash} \nThe password is {hashMatch}".format(hash=hash, hashMatch=hashMatch))
+    sys.exit(0)
+
+if __name__ == "__main__":
+    main()
