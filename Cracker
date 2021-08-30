@@ -91,7 +91,7 @@ def main():
 
     #(Temporary) - Will be used for help/usage option
     if "-h" in sys.argv:
-        print("Pizza")
+        usage()
         sys.exit(0)
 
     if "-s" in sys.argv:
