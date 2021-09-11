@@ -7,17 +7,31 @@ import sys
 
 print("")
 
+#If -v is an argument verbosePrint will be defined or else it will be None
 if "-v" in sys.argv:
-    def verbosePrint(*args):
-        for arg in args:
-            print(arg)
+    def verbosePrint(text):
+        print(text)
 else:
     verbosePrint = lambda a : None
 
-#Function used to take inputted hash and opened wordlist for cracking
+#Usage page for using the cracker, displayed for errors and the -h argument
+def usage():
+    print("Usage: Cracker HashType Hash Wordlist")
+    print("Alternate NTLM Usage: Cracker NTLMHash Wordlist")
+    print("")
+    print("Hash options: Unix, LM, NT")
+    print("")
+    print("Additional Options:")
+    print("(Goes after Wordlist)")
+    print("-h [Help/Usage], -v [Verbose], -s [Salt] (Used for Unix Hash, defaults to HX)")
+    print("")
+    print("Examples:\nCracker NT 8846F7EAEE8FB117AD06BDD830B7586C wordlist.txt -v")
+    print("Cracker Joe:501:E52CAC67419A9A224A3B108F3FA6CB6D:8846F7EAEE8FB117AD06BDD830B7586C::: wordlist.txt")
+
+#Function for cracking Unix hashes
 def crackUnix(hash, wordList, salt):
 
-#Each word is hashed using "HX" as a DES salt and compared to the inputted hash
+#Each word in the list is hashed with the provided salt (none provided means "HX" is the hash), then compared to the provided hash
     for word in wordList:
         resultsUnix = crypt.crypt(word, salt)
         if resultsUnix == hash : #If one of the hashes match, the word/password is returned
@@ -28,11 +42,13 @@ def crackUnix(hash, wordList, salt):
     print("No word in the list matches the hash provided with {salt} as a salt".format(salt=salt))
     sys.exit(0)
 
+#Function for cracking Lan Manager hashes
 def crackLM(hash, wordList):
-    if len(hash) != 32:
+    if len(hash) != 32: #Checks for valid hash by making sure it is 32 characters long
         print("[-] The hash entered is not a Lan Manager hash.\n~LM hashes must be 32 characters long~")
         sys.exit(0)
 
+    #Compares each word and hash using the method verify(), if the verify comes back as True the word is returned
     for word in wordList:
         resultsLM = lmhash.verify(word, hash)
         if resultsLM == True:
@@ -42,24 +58,27 @@ def crackLM(hash, wordList):
     print("No word in the list matches the Lan Manager hash provided")
     sys.exit(0)
 
+#Function for cracking Windows NT hashes
 def crackNT(hash, wordList):
-    if len(hash) != 32:
+    if len(hash) != 32: #Makes sure hash is 32 characters long
         print("[-] The hash entered is not an NT hash.\n~NT hashes must be 32 characters long~")
         sys.exit(0)
 
+    #Compares each word and hash using verify(), will return word if True
     for word in wordList:
         resultsNT = nthash.verify(word, hash)
         if resultsNT == True:
             return word
-        verbosePrint("[*] {word}, Hash does not match... {count}\n".format(word=word, count=count))
+        verbosePrint("[*] {word}, Hash does not match... \n".format(word=word))
 
     print("No word in the list matches the NT hash provided")
     sys.exit(0)
 
+#Function for NTLM hashes, splits hash dump at ":" then grabs the NT hash and wordlist file
 def NTLMhash():
     NTLM = sys.argv[1]
     NTLM = NTLM.split(":")
-    hash = NTLM[2]
+    hash = NTLM[3]
     file = sys.argv[2]
     return hash, file
 
@@ -86,14 +105,16 @@ def main():
         hash = sys.argv[2]
         file = sys.argv[3]
 
+    #Checking for NTLM hashing method, makes sure no help argument is used
     if len(sys.argv) == 3 and sys.argv[:3] != '-h':
         hash, file = NTLMhash()
 
-    #(Temporary) - Will be used for help/usage option
+    #Checks for help argument and displays usage page
     if "-h" in sys.argv:
         usage()
         sys.exit(0)
 
+    #Salt for Unix hash, if salt is not defined it defaults to "HX"
     if "-s" in sys.argv:
         salt = sys.argv[sys.argv.index("-s")+1]
     else:
@@ -102,9 +123,10 @@ def main():
     try:
         wordList = readFile(file)
     except:
-        usage() #WIP
+        usage()
         sys.exit(1)
 
+    #Checks for hashtype being NT, LM, or Unix
     if hashType == "NT" or hashType == "":
         hashMatch = crackNT(hash, wordList)
     elif hashType == "LM":
@@ -112,7 +134,9 @@ def main():
     elif hashType == "Unix":
         hashMatch = crackUnix(hash, wordList, salt)
     else:
-        usage() #WIP on usage function
+        print("[-] Hashtype not defined correctly!\n")
+        usage()
+        sys.exit(0)
 
     print("[+] A match was found for {hash} \nThe password is {hashMatch}".format(hash=hash, hashMatch=hashMatch))
     sys.exit(0)
